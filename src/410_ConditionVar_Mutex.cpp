@@ -19,30 +19,47 @@ mutex 				m;
 condition_variable 	cv;
 bool 				ready = false;	//the condition
 
-void notify() {
-	std::thread::id this_id = std::this_thread::get_id();
-	
-	unique_lock<mutex> lck(m);
-	cout <<"Thread "<<this_id<< ": About to notify"<< endl; //makes it hard to see thread switches
-
-	ready = true;
-	cv.notify_all();
-	
-	cout <<"Thread "<<this_id<< ": Notified, exiting thread"<< endl; //makes it hard to see thread switches
-}
+//if following defined then there is a race condition
+//where waiter can miss being notified, 
+//or a spurious wakeup will cause incorrect behavior
+//#define INCORRECT_NO_SHARED_VAR
 
 void wait() {
 	std::thread::id this_id = std::this_thread::get_id();
 	
 	unique_lock<mutex> lck(m);
 	cout <<"Thread "<<this_id<< ": About to wait"<< endl; //makes it hard to see thread switches
+#ifdef INCORRECT_NO_SHARED_VAR
+	cv.wait(lck);
+#else
 	while (!ready){
 		cv.wait(lck);
 	}
-	ready = false;				//1 comment this out spurious wakeups kill it all
-	cout <<"Thread "<<this_id<< ": Finished waiting, exiting thread"<< endl; //makes it hard to see thread switches
+#endif
 
+	cout <<"Thread "<<this_id<< ": Finished waiting, exiting thread"<< endl; //makes it hard to see thread switches
 }
+
+void notify() {
+	std::thread::id this_id = std::this_thread::get_id();
+#ifdef INCORRECT_NO_SHARED_VAR
+	{
+		unique_lock<mutex> lck(m);
+		cout <<"Thread "<<this_id<< ": About to notify"<< endl; //makes it hard to see thread switches
+	}	
+#else
+	{
+		unique_lock<mutex> lck(m);
+		cout <<"Thread "<<this_id<< ": About to notify"<< endl; //makes it hard to see thread switches
+		ready = true;
+	}
+#endif	
+	cv.notify_all();
+	
+	cout <<"Thread "<<this_id<< ": Notified, exiting thread"<< endl; //makes it hard to see thread switches
+}
+
+
 int main(){
 	thread t_w(wait);
 	thread t_n(notify);	
