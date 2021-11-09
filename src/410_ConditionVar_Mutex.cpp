@@ -22,17 +22,21 @@ bool 				ready = false;	//the condition
 //if following defined then there is a race condition
 //where waiter can miss being notified, 
 //or a spurious wakeup will cause incorrect behavior
-//#define INCORRECT_NO_SHARED_VAR
+#define INCORRECT_NO_SHARED_VAR
 
 void wait() {
 	std::thread::id this_id = std::this_thread::get_id();
+	std::this_thread::sleep_for(std::chrono::milliseconds(1000));	//wait before aquiring lock below
 	
 	unique_lock<mutex> lck(m);
 	cout <<"Thread "<<this_id<< ": About to wait"<< endl; //makes it hard to see thread switches
 #ifdef INCORRECT_NO_SHARED_VAR
+
+
 	cv.wait(lck);
 #else
 	while (!ready){
+		cout <<"Thread "<<this_id<< ": about to call cv.wait()"<< endl;
 		cv.wait(lck);
 	}
 #endif
@@ -41,6 +45,7 @@ void wait() {
 }
 
 void notify() {
+
 	std::thread::id this_id = std::this_thread::get_id();
 #ifdef INCORRECT_NO_SHARED_VAR
 	{
